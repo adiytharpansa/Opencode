@@ -1,0 +1,17 @@
+{
+  "name": "mini-opencode",
+  "version": "0.1.0",
+  "description": "Aplikasi coding-agent serupa opencode (referensi: ./upstream-opencode) — CLI + Web, multi-provider, tools, sessions, mode build/plan.",
+  "type": "module",
+  "bin": {
+    "mini-opencode": "./src/cli.mjs"
+  },
+  "scripts": {
+    "start": "node ./src/server.mjs",
+    "cli": "node ./src/cli.mjs",
+    "demo": "node ./src/demo.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

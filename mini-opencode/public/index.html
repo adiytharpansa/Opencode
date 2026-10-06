@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>opencode — AI coding agent</title>
+<meta name="description" content="Ngobrol langsung dengan AI coding agent ala opencode: multi-provider, tools, sessions, mode build/plan.">
+<style>
+  :root { color-scheme: dark; --bg:#0d1117; --panel:#161b22; --panel2:#1c2128; --line:#30363d; --txt:#e6edf3; --mut:#8b949e; --acc:#2f81f7; --grn:#3fb950; --amb:#d29922; }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--txt); font: 14px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .wrap { display: grid; grid-template-columns: 280px 1fr; height: 100vh; height: 100dvh; }
+  aside { border-right: 1px solid var(--line); background: var(--panel); padding: 14px 12px; display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+  .brand { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 18px; letter-spacing: -.3px; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--amb); }
+  .dot.on { background: var(--grn); }
+  .sub { color: var(--mut); font-size: 12px; }
+  .ctl { display: flex; flex-direction: column; gap: 6px; }
+  .ctl label { font-size: 11px; color: var(--mut); text-transform: uppercase; letter-spacing: .06em; }
+  select, input, button { background: #0d1117; color: var(--txt); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: 13px; width: 100%; }
+  .modes { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .modes button { cursor: pointer; }
+  .modes button.active { border-color: var(--acc); background: #0d1526; font-weight: 700; }
+  #new { background: var(--acc); border-color: var(--acc); font-weight: 700; cursor: pointer; }
+  #sessions { display: flex; flex-direction: column; gap: 6px; overflow-y: auto; min-height: 60px; }
+  .sess { cursor: pointer; padding: 7px 9px; border: 1px solid var(--line); border-radius: 8px; font-size: 13px; }
+  .sess:hover { border-color: var(--acc); }
+  .sess.cur { border-color: var(--acc); background: #0d1526; }
+  .sess small { display: block; color: var(--mut); font-size: 11px; }
+  main { display: flex; flex-direction: column; min-width: 0; }
+  #log { flex: 1; overflow-y: auto; padding: 18px; display: flex; flex-direction: column; gap: 10px; }
+  .msg { border: 1px solid var(--line); border-radius: 12px; padding: 10px 13px; white-space: pre-wrap; word-break: break-word; max-width: 860px; }
+  .msg.u { background: var(--panel2); align-self: flex-end; }
+  .msg.a { background: #0d1526; align-self: flex-start; }
+  .msg.tool { font-family: ui-monospace, SFMono-Regular, monospace; font-size: 12px; color: var(--mut); border-left: 3px solid var(--acc); align-self: flex-start; max-width: 860px; }
+  .msg.err { border-color: #f85149; }
+  .hint { color: var(--mut); font-size: 12px; text-align: center; }
+  .hint code { color: var(--txt); }
+  form { display: flex; gap: 8px; padding: 12px; border-top: 1px solid var(--line); }
+  #q { flex: 1; }
+  form button { width: auto; background: var(--acc); border-color: var(--acc); font-weight: 700; cursor: pointer; padding: 8px 20px; }
+  form button:disabled { opacity: .5; cursor: wait; }
+  .typing { color: var(--mut); font-size: 12px; }
+  @media (max-width: 720px) {
+    .wrap { grid-template-columns: 1fr; }
+    aside { display: none; }
+    aside.open { display: flex; position: fixed; z-index: 10; width: 280px; height: 100dvh; }
+    #menu { display: inline-block !important; }
+  }
+  #menu { display: none; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; color: var(--txt); padding: 6px 10px; margin: 10px 12px 0; width: auto; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <aside id="side">
+    <div class="brand"><span class="dot" id="dot"></span> opencode</div>
+    <div class="sub" id="status">AI coding agent · menghubungkan…</div>
+    <div class="ctl">
+      <label>Provider</label>
+      <select id="provider">
+        <option value="openai">openai</option>
+        <option value="anthropic">anthropic</option>
+        <option value="gemini">gemini</option>
+        <option value="ollama">ollama (lokal)</option>
+        <option value="openrouter">openrouter</option>
+      </select>
+    </div>
+    <div class="ctl">
+      <label>Model</label>
+      <input id="model" value="gpt-4o-mini">
+    </div>
+    <div class="ctl">
+      <label>Mode agen (seperti Tab di opencode)</label>
+      <div class="modes">
+        <button id="m-build" class="active" type="button">🔨 build</button>
+        <button id="m-plan" type="button" title="read-only">🔍 plan</button>
+      </div>
+    </div>
+    <button id="new" type="button">+ Sesi baru</button>
+    <div class="ctl"><label>Sesi</label></div>
+    <div id="sessions"></div>
+    <div class="sub">Tanpa API key = mode offline (tools lokal tetap jalan). Isi key via env server: OPENAI_API_KEY / ANTHROPIC_API_KEY / GEMINI_API_KEY.</div>
+  </aside>
+  <main>
+    <button id="menu" type="button">☰ opencode</button>
+    <div id="log"></div>
+    <form id="f">
+      <input id="q" placeholder="Ngobrol dengan AI agent… cth: bacakan mini-opencode/package.json" autocomplete="off">
+      <button id="send" type="submit">Kirim</button>
+    </form>
+  </main>
+</div>
+<script>
+let sessionId = null, mode = 'build', busy = false;
+const log = document.getElementById('log');
+const q = document.getElementById('q');
+const sendBtn = document.getElementById('send');
+
+function add(cls, text) {
+  const d = document.createElement('div');
+  d.className = 'msg ' + cls;
+  d.textContent = text;
+  log.appendChild(d);
+  log.scrollTop = log.scrollHeight;
+  return d;
+}
+function welcome() {
+  add('a', '🤖 Halo! Saya opencode, AI coding agent.\n\nLangsung ngobrol saja — saya bisa:\n• membaca & mencari file proyek (read, glob, grep)\n• menulis / mengedit file (mode build)\n• menjalankan perintah shell\n\nCoba: "bacakan mini-opencode/package.json" atau "daftar file .mjs di mini-opencode/src".');
+  const h = document.createElement('div');
+  h.className = 'hint';
+  h.innerHTML = 'Mode <code>plan</code> = read-only (aman untuk eksplorasi). Mode <code>build</code> = boleh menulis file.';
+  log.appendChild(h);
+}
+document.getElementById('menu').onclick = () => document.getElementById('side').classList.toggle('open');
+
+function setMode(m) {
+  mode = m;
+  document.getElementById('m-build').classList.toggle('active', m === 'build');
+  document.getElementById('m-plan').classList.toggle('active', m === 'plan');
+}
+document.getElementById('m-build').onclick = () => setMode('build');
+document.getElementById('m-plan').onclick = () => setMode('plan');
+
+async function refreshSessions() {
+  try {
+    const r = await fetch('/api/sessions').then(r => r.json());
+    const box = document.getElementById('sessions');
+    box.innerHTML = '';
+    if (!r.sessions.length) { box.innerHTML = '<div class="sub">Belum ada sesi.</div>'; return; }
+    r.sessions.forEach(s => {
+      const d = document.createElement('div');
+      d.className = 'sess' + (s.id === sessionId ? ' cur' : '');
+      const t = document.createElement('div');
+      t.textContent = s.title || s.id;
+      const m = document.createElement('small');
+      m.textContent = s.messageCount + ' pesan';
+      d.appendChild(t); d.appendChild(m);
+      d.onclick = async () => {
+        sessionId = s.id;
+        const full = await fetch('/api/sessions/' + s.id).then(r => r.json());
+        log.innerHTML = '';
+        (full.session.messages || []).forEach(m2 => {
+          if (m2.role === 'user') add('u', '🧑 ' + (m2.content || ''));
+          else if (m2.role === 'assistant') add('a', '🤖 ' + (m2.content || ''));
+          else if (m2.role === 'tool') add('tool', '🔧 ' + (m2.name || 'tool') + '\n' + String(m2.content || '').slice(0, 1500));
+        });
+        refreshSessions();
+      };
+      box.appendChild(d);
+    });
+  } catch {}
+}
+document.getElementById('new').onclick = async () => {
+  const r = await fetch('/api/sessions', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ title: 'Sesi ' + new Date().toLocaleTimeString() }) }).then(r => r.json());
+  sessionId = r.session.id;
+  log.innerHTML = '';
+  welcome();
+  refreshSessions();
+};
+
+document.getElementById('f').onsubmit = async (e) => {
+  e.preventDefault();
+  const message = q.value.trim();
+  if (!message || busy) return;
+  busy = true; sendBtn.disabled = true;
+  q.value = '';
+  add('u', '🧑 ' + message);
+  const typing = add('typing', 'opencode sedang berpikir…');
+  const body = { message, sessionId, provider: document.getElementById('provider').value, model: document.getElementById('model').value, mode };
+  try {
+    const res = await fetch('/api/chat', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    const reader = res.body.getReader();
+    const dec = new TextDecoder();
+    let buf = '', cur = null;
+    typing.remove();
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      const parts = buf.split('\n\n');
+      buf = parts.pop();
+      for (const p of parts) {
+        const line = p.trim();
+        if (!line.startsWith('data:')) continue;
+        let ev; try { ev = JSON.parse(line.slice(5)); } catch { continue; }
+        if (ev.sessionId) sessionId = ev.sessionId;
+        if (ev.type === 'assistant' && ev.content) add('a', '🤖 ' + ev.content);
+        if (ev.type === 'tool_start') cur = add('tool', '🔧 ' + ev.name + ' ' + JSON.stringify(ev.arguments).slice(0, 300));
+        if (ev.type === 'tool_result' && cur) cur.textContent += '\n' + (ev.result.ok ? '✅ ok' : '❌ ' + ev.result.error);
+        if (ev.type === 'error') add('err', '❌ ' + ev.error);
+      }
+    }
+  } catch (err) {
+    typing.remove();
+    add('err', '❌ Gagal menghubungi server: ' + err.message);
+  }
+  busy = false; sendBtn.disabled = false;
+  refreshSessions();
+};
+
+fetch('/api/config').then(r => r.json()).then(c => {
+  if (c.provider) document.getElementById('provider').value = c.provider;
+  if (c.model) document.getElementById('model').value = c.model;
+  if (c.mode) setMode(c.mode);
+  const online = !!(c.hasKey || c.online);
+  document.getElementById('dot').classList.toggle('on', true);
+  document.getElementById('status').textContent = 'AI coding agent · ' + (online ? 'LLM tersambung' : 'mode offline (tools lokal aktif)');
+}).catch(() => {
+  document.getElementById('status').textContent = 'AI coding agent · mode offline';
+});
+welcome();
+refreshSessions();
+</script>
+</body>
+</html>

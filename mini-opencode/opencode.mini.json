@@ -1,0 +1,38 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "note": "Config contoh mini-opencode. Kompatibel subset dengan opencode.json asli. Lihat upstream-opencode untuk referensi penuh.",
+  "model": "gpt-4o-mini",
+  "provider": "openai",
+  "mode": "build",
+  "providers": {
+    "openai": {
+      "baseURL": "https://api.openai.com/v1",
+      "apiKeyEnv": "OPENAI_API_KEY",
+      "models": ["gpt-4o-mini", "gpt-4o"]
+    },
+    "anthropic": {
+      "baseURL": "https://api.anthropic.com",
+      "apiKeyEnv": "ANTHROPIC_API_KEY",
+      "models": ["claude-sonnet-4-5", "claude-haiku-4-5"]
+    },
+    "gemini": {
+      "baseURL": "https://generativelanguage.googleapis.com",
+      "apiKeyEnv": "GEMINI_API_KEY",
+      "models": ["gemini-2.5-flash", "gemini-2.5-pro"]
+    },
+    "ollama": {
+      "baseURL": "http://localhost:11434/v1",
+      "apiKeyEnv": "",
+      "models": ["qwen2.5-coder", "llama3.1"]
+    },
+    "openrouter": {
+      "baseURL": "https://openrouter.ai/api/v1",
+      "apiKeyEnv": "OPENROUTER_API_KEY",
+      "models": ["auto"]
+    }
+  },
+  "permission": {
+    "planBlocks": ["write", "edit", "bash"],
+    "askBeforeBash": true
+  }
+}
